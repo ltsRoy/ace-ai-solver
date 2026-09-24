@@ -3,11 +3,8 @@
 // (URL, hostname, title, selectors, cookies) is put in the prompt, and text is scrubbed first.
 // ---- Anonymous usage counters (shown as badges on the GitHub README) ----
 // Only increments a public counter: no ID, no URL, no question/code, nothing about the user.
-// Opt out in the popup ("Send anonymous usage counts").
 const STATS = "https://abacus.jasoncameron.dev/hit/ltsroy-ace-ai-solver/";
 async function bump(key) {
-  const { noStats } = await chrome.storage.local.get("noStats");
-  if (noStats) return;
   fetch(STATS + key, { credentials: "omit", referrerPolicy: "no-referrer" }).catch(() => {});
 }
 // "active-days": at most one bump per install per calendar day, only when it's actually used

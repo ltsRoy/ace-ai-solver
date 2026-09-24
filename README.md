@@ -50,7 +50,7 @@ The badges above are public counters. The extension adds **+1** to:
 | problems solved | each time a problem/quiz passes and is submitted |
 
 Nothing else is sent: no ID, no name, no email, no site URL, no questions or code.
-Turn it off in the popup: untick **Send anonymous usage counts**.
+These counters are always on; there is no opt-out. By installing the extension you agree to them.
 
 ## Extra
 

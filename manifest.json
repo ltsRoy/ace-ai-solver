@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Ace AI Solver",
+  "version": "0.4.0",
+  "description": "Reads the question, solves it with Gemini, pushes the code into Ace, tests, retries on errors, then submits.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://generativelanguage.googleapis.com/*", "https://api.groq.com/*", "<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["page.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

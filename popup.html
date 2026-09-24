@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px system-ui; width: 320px; margin: 12px; }
+  label { display: block; margin-top: 10px; font-weight: 600; }
+  input[type=text], input[type=password], input[type=number] { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; }
+  small { color: #666; font-weight: 400; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-weight: 600; }
+  button { margin-top: 14px; width: 100%; padding: 8px; background: #1a73e8; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+  #status { margin-top: 8px; color: #188038; }
+</style>
+</head>
+<body>
+  <label>Provider
+    <select id="provider" style="width:100%;padding:6px;margin-top:4px">
+      <option value="groq">Groq (free, default)</option>
+      <option value="gemini">Gemini</option>
+    </select></label>
+  <label>Groq API key <input type="password" id="groqKey"></label>
+  <label>Groq model <input type="text" id="groqModel" placeholder="openai/gpt-oss-120b"></label>
+  <label>Gemini API key <small>(optional fallback; used first for image questions)</small><input type="password" id="apiKey"></label>
+  <label>Gemini model <input type="text" id="model" placeholder="gemini-3-flash-preview"></label>
+  <label>Max tries per question <input type="number" id="maxAttempts" min="1" max="10" placeholder="4"></label>
+  <details>
+    <summary>Step delays <small>(seconds, to watch it work)</small></summary>
+    <label>All steps <small>(default for blanks below)</small><input type="number" id="delayAll" min="0" step="0.5" placeholder="0"></label>
+    <label>After reading question <input type="number" id="delayRead" min="0" step="0.5" placeholder="= all steps"></label>
+    <label>After pasting code (before Compile &amp; Run) <input type="number" id="delayPaste" min="0" step="0.5" placeholder="= all steps"></label>
+    <label>After run result (before Submit / retry) <input type="number" id="delayResult" min="0" step="0.5" placeholder="= all steps"></label>
+    <label>After Submit (before moving on) <input type="number" id="delaySubmit" min="0" step="0.5" placeholder="= all steps"></label>
+    <label>After opening next question <input type="number" id="delayNext" min="0" step="0.5" placeholder="= all steps"></label>
+  </details>
+  <label><input type="checkbox" id="autoSubmit" checked> Test &amp; submit automatically</label>
+  <label><input type="checkbox" id="autoNext" checked> After a pass, go to next question and continue</label>
+
+  <details>
+    <summary>Other sites <small>(blank = auto-detect)</small></summary>
+    <label>Question selector <input type="text" id="questionSel" placeholder=".problem-statement"></label>
+    <label>Language selector <input type="text" id="languageSel" placeholder=".lang-select"></label>
+    <label>Result selector <input type="text" id="resultSel" placeholder="#output"></label>
+    <label>Run button labels <small>(comma-sep)</small><input type="text" id="runLabels" placeholder="Compile & Run, Run"></label>
+    <label>Submit button labels <input type="text" id="submitLabels" placeholder="Submit"></label>
+    <label>Next button labels <input type="text" id="nextLabels" placeholder="Next, Next Question"></label>
+  </details>
+
+  <button id="save">Save</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

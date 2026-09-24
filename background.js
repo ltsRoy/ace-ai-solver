@@ -1,7 +1,28 @@
 // Holds the Groq / Gemini calls so the API keys never touch the page.
 // Privacy: the model only ever sees the question, language and code. Nothing identifying the site
 // (URL, hostname, title, selectors, cookies) is put in the prompt, and text is scrubbed first.
+// ---- Anonymous usage counters (shown as badges on the GitHub README) ----
+// Only increments a public counter: no ID, no URL, no question/code, nothing about the user.
+// Opt out in the popup ("Send anonymous usage counts").
+const STATS = "https://abacus.jasoncameron.dev/hit/ltsroy-ace-ai-solver/";
+async function bump(key) {
+  const { noStats } = await chrome.storage.local.get("noStats");
+  if (noStats) return;
+  fetch(STATS + key, { credentials: "omit", referrerPolicy: "no-referrer" }).catch(() => {});
+}
+// "active-days": at most one bump per install per calendar day, only when it's actually used
+async function markActive() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { lastActive } = await chrome.storage.local.get("lastActive");
+  if (lastActive === today) return;
+  await chrome.storage.local.set({ lastActive: today });
+  bump("active-days");
+}
+chrome.runtime.onInstalled.addListener(({ reason }) => { if (reason === "install") bump("installs"); });
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "stat") { if (msg.key === "solved") bump("solved"); return; }
+  if (msg.type === "solve" || msg.type === "quiz") markActive();
   const handler = { solve, quiz: solveQuiz }[msg.type];
   if (!handler) return;
   handler(msg, sender.tab?.url).then(sendResponse, (err) => sendResponse({ ok: false, error: String(err.message || err) }));

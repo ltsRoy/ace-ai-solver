@@ -478,6 +478,7 @@
         const ok = isQuizPage() ? await solveQuizPage(cfg, set) : await solveCurrent(p, cfg, set);
         if (!ok) break;           // stop the chain on a failure so you can look at it
         solved++;
+        chrome.runtime.sendMessage({ type: "stat", key: "solved" }).catch(() => {});
         if (cfg.autoNext === false || cfg.autoSubmit === false) break;
         await sleep(1000);
         if (!(await goNext(p, cfg, set))) { set(`Done: ${solved} solved (no next question)`); break; }

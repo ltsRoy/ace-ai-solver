@@ -13,7 +13,8 @@
       title: ".assessment-header-title",
       // Current tab is solvable only if it's an unfinished programming assignment with an editor
       onSolvable: () => {
-        if (!document.getElementById("code-editor") || !document.querySelector(".programming-action-buttons")) return false;
+        const isCode = document.getElementById("code-editor") && document.querySelector(".programming-action-buttons");
+        if (!isCode && !isQuizPage()) return false;
         const cur = document.querySelector('[id^="unit-"][id$="-list"] button.border-blue-600');
         return !cur || !cur.querySelector(".lucide-circle-check");
       },
@@ -35,7 +36,7 @@
   // finished items show a lucide-circle-check icon. Next = first unfinished programming
   // assignment after the current one, expanding collapsed units on the way.
   async function sidebarNext() {
-    const isPA = (b) => /programming assignment/i.test(b.innerText);
+    const isPA = (b) => /programming assignment|quiz/i.test(b.innerText);
     const done = (b) => !!b.querySelector(".lucide-circle-check");
     const after = (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
     const current = document.querySelector('[id^="unit-"][id$="-list"] button.border-blue-600');
@@ -314,6 +315,118 @@
     return passed;
   }
 
+  // ---------------- MCQ quizzes ----------------
+  const CHOICE = 'input[type=radio], input[type=checkbox], [role=radio], [role=checkbox]';
+  const inSidebar = (el) => !!el.closest('[id^="unit-"], nav, aside, #ace-gemini-btn');
+  const choices = (root = document) => [...root.querySelectorAll(CHOICE)].filter((el) => !inSidebar(el));
+  const isQuizPage = () => !document.getElementById("code-editor") && choices().length >= 2;
+
+  // Group options into questions, then grow each group to its "card" (question text + options).
+  function readQuiz() {
+    const groups = new Map();
+    for (const el of choices()) {
+      let key = (el.name && `name:${el.name}`) || el.closest("[role=radiogroup]");
+      if (!key) { // unnamed: first ancestor holding 2+ options
+        let a = el.parentElement;
+        while (a && choices(a).length < 2) a = a.parentElement;
+        key = a;
+      }
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(el);
+    }
+    const qs = [];
+    for (const opts of groups.values()) {
+      let card = opts[0].parentElement;
+      while (card && !opts.every((o) => card.contains(o))) card = card.parentElement;
+      while (card?.parentElement && choices(card.parentElement).length === opts.length) card = card.parentElement;
+      if (!card) continue;
+      const letters = opts.map((o, i) => optionLetter(o) || String.fromCharCode(97 + i));
+      const multi = opts.some((o) => o.type === "checkbox" || o.getAttribute("role") === "checkbox");
+      const imgs = [...card.querySelectorAll("img")].filter((i) => i.naturalWidth >= 40).map((i) => i.currentSrc || i.src);
+      qs.push({ card, opts, letters, multi, imgs, text: card.innerText.trim().slice(0, 4000) });
+    }
+    qs.sort((a, b) => (a.card.compareDocumentPosition(b.card) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    qs.forEach((q, i) => (q.id = String(i + 1)));
+    return qs;
+  }
+
+  // "a." / "(b)" / "C)" next to the radio -> letter
+  function optionLetter(el) {
+    const lab = el.labels?.[0] || el.closest("label") || el.parentElement;
+    const t = (lab?.innerText || el.getAttribute("aria-label") || el.value || "").trim();
+    const m = t.match(/^\(?([a-hA-H])[.)\]:]?(\s|$)/);
+    return m ? m[1].toLowerCase() : "";
+  }
+
+  const isChecked = (el) => el.checked === true || el.getAttribute("aria-checked") === "true";
+  async function choose(el, want) {
+    if (isChecked(el) === want) return;
+    (el.labels?.[0] || el).click();
+    await sleep(120);
+    if (isChecked(el) !== want) { el.click(); await sleep(120); }
+  }
+
+  async function solveQuizPage(cfg, set) {
+    const qs = readQuiz();
+    if (!qs.length) throw new Error("No quiz questions found");
+    if (qs.every((q) => q.opts.every((o) => o.disabled || o.getAttribute("aria-disabled") === "true")))
+      { set("Quiz already submitted / closed"); return true; }
+    console.log("[Ace Gemini] quiz:", qs.map((q) => ({ id: q.id, letters: q.letters, multi: q.multi, text: q.text.slice(0, 80) })));
+    await pause(cfg, "delayRead", set, `Read ${qs.length} quiz questions`);
+
+    set(`Asking AI (${qs.length} MCQs)…`);
+    const res = await chrome.runtime.sendMessage({
+      type: "quiz",
+      questions: qs.map(({ id, letters, multi, text }) => ({ id, letters, multi, text })),
+      images: qs.flatMap((q) => q.imgs).slice(0, 10)
+    });
+    if (!res?.ok) throw new Error(res?.error || "No response from background");
+    console.log("[Ace Gemini] quiz answers:", res.answers);
+
+    set("Selecting answers…");
+    let answered = 0;
+    for (const q of qs) {
+      stopped();
+      let pick = res.answers[q.id] ?? res.answers[+q.id];
+      pick = (Array.isArray(pick) ? pick : [pick]).map((x) => String(x || "").trim().toLowerCase().replace(/[^a-h]/g, "")).filter(Boolean);
+      if (!q.multi) pick = pick.slice(0, 1);
+      if (!pick.length) continue;
+      for (let i = 0; i < q.opts.length; i++) {
+        const want = pick.includes(q.letters[i]);
+        if (want || q.multi) await choose(q.opts[i], want);
+      }
+      if (q.opts.some(isChecked)) answered++;
+      q.card.scrollIntoView({ block: "center", behavior: "smooth" });
+      await sleep(150);
+    }
+    if (answered < qs.length) console.warn(`[Ace Gemini] only ${answered}/${qs.length} questions got a selection`);
+    await pause(cfg, "delayPaste", set, `Selected ${answered}/${qs.length} answers`);
+    if (cfg.autoSubmit === false) { set(`Selected ${answered}/${qs.length} (auto-submit off)`); return false; }
+
+    const submit = findButton({ buttons: "button, input[type=submit], [role=button]" },
+      ["Submit Answers", "Submit Quiz", "Submit Assignment", "Submit"]);
+    if (!submit) throw new Error("Quiz Submit button not found");
+    if (submit.disabled) throw new Error("Quiz Submit is disabled");
+    set("Submitting quiz…");
+    submit.click();
+
+    // Confirmation popup ("Are you sure?") -> confirm; then wait for a success message
+    const end = Date.now() + 20000;
+    let confirmed = false, ok = false;
+    while (Date.now() < end) {
+      await sleep(500);
+      const dlg = document.querySelector('[role=dialog], [role=alertdialog], .assessment-modal-overlay, [class*=modal]');
+      if (dlg && !confirmed) {
+        const yes = [...dlg.querySelectorAll("button")].find((b) => /^(yes|confirm|submit|ok|proceed)/i.test(b.innerText.trim()));
+        if (yes) { yes.click(); confirmed = true; continue; }
+      }
+      if (/successfully submitted|submitted successfully|your answers.*submitted|score/i.test(document.body.innerText)) { ok = true; break; }
+    }
+    document.querySelector(".assessment-modal-close")?.click();
+    await pause(cfg, "delaySubmit", set, ok ? "Quiz submitted" : "Quiz submit clicked (no confirmation seen)");
+    return true;
+  }
+
   // Next question: site button by label, else rel=next link.
   function findNext(p, cfg) {
     const labels = splitLabels(cfg.nextLabels) || ["Next", "Next Question", "Next Problem", "Save & Next", "Next Assignment", "Continue"];
@@ -332,7 +445,7 @@
     while (Date.now() < end) {
       await sleep(700);
       stopped();
-      if (document.querySelector(".ace_editor") && fingerprint(p) !== before) {
+      if ((document.querySelector(".ace_editor") || isQuizPage()) && fingerprint(p) !== before) {
         await sleep(1500); // let the new editor + template settle
         await pause(cfg, "delayNext", set, "Opened next question");
         return true;
@@ -362,7 +475,7 @@
           if (!(await goNext(p, cfg, set))) { set(`Done: ${solved} solved (no more assignments)`); break; }
           continue;
         }
-        const ok = await solveCurrent(p, cfg, set);
+        const ok = isQuizPage() ? await solveQuizPage(cfg, set) : await solveCurrent(p, cfg, set);
         if (!ok) break;           // stop the chain on a failure so you can look at it
         solved++;
         if (cfg.autoNext === false || cfg.autoSubmit === false) break;

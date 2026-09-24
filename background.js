@@ -2,8 +2,9 @@
 // Privacy: the model only ever sees the question, language and code. Nothing identifying the site
 // (URL, hostname, title, selectors, cookies) is put in the prompt, and text is scrubbed first.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type !== "solve") return;
-  solve(msg, sender.tab?.url).then(sendResponse, (err) => sendResponse({ ok: false, error: String(err.message || err) }));
+  const handler = { solve, quiz: solveQuiz }[msg.type];
+  if (!handler) return;
+  handler(msg, sender.tab?.url).then(sendResponse, (err) => sendResponse({ ok: false, error: String(err.message || err) }));
   return true; // keep the channel open for the async reply
 });
 
@@ -84,8 +85,12 @@ async function solve({ question, images, language, starterCode, prefix, suffix, 
   });
   const temperature = history.length ? 0.4 : 0.2;
 
-  // Order: chosen provider first, the other as fallback. Groq models here can't see images,
-  // so an image question goes to Gemini first when a Gemini key exists.
+  return { ok: true, code: stripFences(await askAI(cfg, turns, images, temperature)) };
+}
+
+// Order: chosen provider first, the other as fallback. Groq models here can't see images,
+// so an image question goes to Gemini first when a Gemini key exists.
+async function askAI(cfg, turns, images, temperature) {
   const groq = () => callGroq(cfg.groqKey, cfg.groqModel, turns, temperature);
   const gemini = async () => callGemini(cfg.apiKey, cfg.model, await geminiContents(turns, images), temperature);
   let order = (cfg.provider || "groq") === "gemini" ? [gemini, groq] : [groq, gemini];
@@ -94,10 +99,30 @@ async function solve({ question, images, language, starterCode, prefix, suffix, 
 
   const errors = [];
   for (const call of order) {
-    try { return { ok: true, code: stripFences(await call()) }; }
+    try { return await call(); }
     catch (e) { errors.push(e.message); console.warn("[Ace Gemini]", e.message); }
   }
   throw new Error(errors.join(" | ").slice(0, 300));
+}
+
+// ---- MCQ quiz: all questions in one request, answers back as JSON letters ----
+async function solveQuiz({ questions, images }, tabUrl) {
+  const cfg = await chrome.storage.local.get(["provider", "apiKey", "model", "groqKey", "groqModel"]);
+  if (!cfg.groqKey && !cfg.apiKey) throw new Error("Set a Groq or Gemini API key in the extension popup");
+  const clean = makeScrubber(tabUrl);
+  const body = questions.map((q) =>
+    `QUESTION ${q.id} (${q.multi ? "select ALL correct options" : "exactly ONE correct option"}; ` +
+    `options: ${q.letters.join(", ")}):\n${clean(q.text)}`).join("\n\n-----\n\n");
+  const prompt =
+    `Answer these multiple-choice questions. Think carefully, then reply with ONLY a JSON object ` +
+    `mapping each question number to an array of option letters, e.g. {"1":["a"],"2":["b","d"]}. ` +
+    `Use only the listed letters. No explanation.\n\n${body}`;
+  const text = await askAI(cfg, [{ role: "user", text: prompt }], images, 0.1);
+  const json = text.match(/\{[\s\S]*\}/);
+  if (!json) throw new Error("AI did not return JSON answers");
+  let answers;
+  try { answers = JSON.parse(json[0]); } catch { throw new Error("AI returned malformed JSON"); }
+  return { ok: true, answers };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

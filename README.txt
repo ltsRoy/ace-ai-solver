@@ -1,10 +1,11 @@
-Ace AI Solver (v0.4.0) - Edge / Chrome extension
+Ace AI Solver (v0.5.0) - Edge / Chrome extension
 
 WHAT IT DOES
 On a page with an Ace code editor it reads the question, asks an AI (Groq or Gemini) for a
 solution, pastes it into the editor, clicks "Compile & Run", checks every test row
 (Output must equal Expected Output), feeds errors back to the AI and retries, clicks Submit
 only after a clean run, then opens the next unfinished Programming Assignment in the sidebar.
+Quiz pages (MCQs): answers all questions in one AI request, selects them, submits, moves on.
 The AI receives only the question text/images and the code, never the site's URL or name.
 
 INSTALL

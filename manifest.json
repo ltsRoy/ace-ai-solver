@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ace AI Solver",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Reads the question, solves it with Gemini, pushes the code into Ace, tests, retries on errors, then submits.",
   "permissions": ["storage"],
   "host_permissions": ["https://generativelanguage.googleapis.com/*", "https://api.groq.com/*", "<all_urls>"],

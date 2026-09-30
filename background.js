@@ -81,6 +81,8 @@ async function solve({ question, images, language, starterCode, prefix, suffix, 
         `the grader joins PREFIX + your code + SUFFIX. Return ONLY the EDITABLE part and do not ` +
         `repeat anything from PREFIX or SUFFIX.\n`
       : `Return the complete code for the editor. Keep any given function/class signatures exactly.\n`) +
+    `If the code/question says not to add or delete lines, return EXACTLY the same number of lines ` +
+    `as the EDITABLE PART and only change contents of lines.\n` +
     `\nQUESTION:\n${clean(question) || "(see attached image)"}\n` +
     (images?.length ? `The question also includes the attached image(s); read them carefully.\n` : "") +
     (prefix ? `\nPREFIX (fixed, read-only):\n${clean(prefix)}\n` : "") +
@@ -96,7 +98,11 @@ async function solve({ question, images, language, starterCode, prefix, suffix, 
       text:
         `That attempt (#${i + 1}) did not pass. Judge output:\n${clean(h.feedback)}\n\n` +
         `Find the actual cause (compile error line, wrong output format, edge case, off-by-one, ` +
-        `performance, input parsing) and fix it. Do not just repeat the same approach` +
+        `performance, input parsing) and fix it. If the error comes from the RUNTIME ENVIRONMENT ` +
+        `rather than your logic (e.g. missing/unwritable temp directory like /tmp, native library ` +
+        `load failure such as UnsatisfiedLinkError, file permission errors), work around it with ` +
+        `settings, e.g. point temp-dir system properties at System.getProperty("user.dir") or ".". ` +
+        `Do not just repeat the same approach` +
         (i >= 1 ? " — multiple attempts failed, so reconsider the algorithm and re-read the I/O format" : "") +
         `. Return ONLY the corrected ${split ? "EDITABLE part" : "code"}, no fences.`
     });

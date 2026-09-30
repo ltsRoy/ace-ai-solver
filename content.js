@@ -489,8 +489,16 @@
     } finally {
       running = false;
       await chrome.storage.local.set({ chainActive: false });
-      setTimeout(() => { if (!running) btn.textContent = "Solve with AI"; }, 15000);
+      setTimeout(() => { if (!running) idleLabel(btn); }, 15000);
     }
+  }
+
+  // Idle label, with a hint when a newer version is on GitHub (details in the popup)
+  function idleLabel(btn) {
+    btn.textContent = "Solve with AI";
+    chrome.storage.local.get("update").then(({ update }) => {
+      if (update && !running) { btn.textContent = `Solve with AI  ·  v${update.version} available`; btn.title = "Open the extension popup to update"; }
+    }).catch(() => {});
   }
 
   // SPA-safe: the editor can mount/unmount without a reload, so keep the button in sync.
@@ -501,7 +509,7 @@
     if (existing) return;
     const btn = document.createElement("button");
     btn.id = "ace-gemini-btn";
-    btn.textContent = "Solve with AI";
+    idleLabel(btn);
     // "Next" caused a full reload mid-chain: pick up where we left off
     chrome.storage.local.get("chainActive").then(({ chainActive }) => {
       if (chainActive && !running) setTimeout(() => run(btn), 2000);

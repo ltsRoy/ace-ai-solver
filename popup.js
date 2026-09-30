@@ -13,3 +13,24 @@ document.getElementById("save").onclick = async () => {
   await chrome.storage.local.set(cfg);
   document.getElementById("status").textContent = "Saved";
 };
+
+// ---- Update banner ----
+const $ = (id) => document.getElementById(id);
+const current = chrome.runtime.getManifest().version;
+$("myVer").textContent = current;
+async function showUpdate() {
+  const { update } = await chrome.storage.local.get("update");
+  $("update").style.display = update ? "block" : "none";
+  if (!update) return;
+  $("newVer").textContent = "v" + update.version;
+  $("curVer").textContent = "v" + current;
+  $("dlUpdate").onclick = () => chrome.tabs.create({ url: update.zip });
+}
+$("reloadExt").onclick = () => chrome.runtime.reload();
+$("checkNow").onclick = async () => {
+  $("checkNow").textContent = "checking…";
+  await chrome.runtime.sendMessage({ type: "checkUpdate" });
+  await showUpdate();
+  $("checkNow").textContent = (await chrome.storage.local.get("update")).update ? "update found" : "up to date";
+};
+showUpdate();

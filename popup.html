@@ -11,9 +11,25 @@
   summary { cursor: pointer; font-weight: 600; }
   button { margin-top: 14px; width: 100%; padding: 8px; background: #1a73e8; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
   #status { margin-top: 8px; color: #188038; }
+  #update { display: none; background: #fff4e5; border: 1px solid #f5a623; border-radius: 8px; padding: 10px; }
+  #update b { color: #b35c00; }
+  #update ol { margin: 6px 0 0 18px; padding: 0; }
+  #update button { margin-top: 8px; }
+  #update .secondary { background: #fff; color: #1a73e8; border: 1px solid #1a73e8; }
+  #ver { color: #888; font-size: 11px; margin-top: 10px; text-align: center; }
+  #ver a { color: #1a73e8; cursor: pointer; }
 </style>
 </head>
 <body>
+  <div id="update">
+    <b>New version <span id="newVer"></span> available</b> (you have <span id="curVer"></span>)
+    <ol>
+      <li>Download the update and unzip it <b>over your current extension folder</b> (replace files).</li>
+      <li>Click <b>Reload now</b>.</li>
+    </ol>
+    <button id="dlUpdate">⬇ Download update</button>
+    <button id="reloadExt" class="secondary">↻ Reload now (after replacing files)</button>
+  </div>
   <label>Provider
     <select id="provider" style="width:100%;padding:6px;margin-top:4px">
       <option value="groq">Groq (free, default)</option>
@@ -48,6 +64,7 @@
 
   <button id="save">Save</button>
   <div id="status"></div>
+  <div id="ver">v<span id="myVer"></span> · <a id="checkNow">check for updates</a></div>
   <script src="popup.js"></script>
 </body>
 </html>

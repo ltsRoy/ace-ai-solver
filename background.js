@@ -15,10 +15,45 @@ async function markActive() {
   await chrome.storage.local.set({ lastActive: today });
   bump("active-days");
 }
-chrome.runtime.onInstalled.addListener(({ reason }) => { if (reason === "install") bump("installs"); });
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === "install") bump("installs");
+  checkUpdate();
+});
+
+// ---- Update check: latest GitHub release vs this version -> badge + popup banner ----
+const RELEASES = "https://api.github.com/repos/ltsRoy/ace-ai-solver/releases/latest";
+const newer = (a, b) => { // is a > b ("0.7.0" vs "0.6.1")
+  const x = a.replace(/^v/, "").split(".").map(Number), y = b.replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+async function checkUpdate() {
+  try {
+    const r = await fetch(RELEASES, { credentials: "omit", cache: "no-store" });
+    if (!r.ok) return;
+    const rel = await r.json();
+    const current = chrome.runtime.getManifest().version;
+    if (rel.tag_name && newer(rel.tag_name, current)) {
+      const zip = rel.assets?.find((a) => a.name.endsWith(".zip"));
+      await chrome.storage.local.set({ update: {
+        version: rel.tag_name.replace(/^v/, ""), page: rel.html_url,
+        zip: zip?.browser_download_url || rel.html_url, notes: (rel.body || "").slice(0, 600)
+      } });
+      chrome.action.setBadgeText({ text: "NEW" });
+      chrome.action.setBadgeBackgroundColor({ color: "#d93025" });
+    } else {
+      await chrome.storage.local.remove("update");
+      chrome.action.setBadgeText({ text: "" });
+    }
+  } catch {}
+}
+chrome.runtime.onStartup.addListener(checkUpdate);
+chrome.alarms.create("update-check", { periodInMinutes: 360 });
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === "update-check") checkUpdate(); });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "stat") { if (msg.key === "solved") bump("solved"); return; }
+  if (msg.type === "checkUpdate") { checkUpdate().then(() => sendResponse({ ok: true })); return true; }
   if (msg.type === "solve" || msg.type === "quiz") markActive();
   const handler = { solve, quiz: solveQuiz }[msg.type];
   if (!handler) return;

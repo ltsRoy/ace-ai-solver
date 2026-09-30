@@ -39,6 +39,13 @@ Open the console (F12) for log lines starting with `[Ace Gemini]`.
 
 After editing files: click **Reload** on the extension card, then refresh the page.
 
+## Updates
+
+The extension checks GitHub for a newer release (at browser start and every 6 hours).
+When one exists you'll see a red **NEW** badge on the icon and a banner in the popup:
+1. Click **Download update**, unzip it **over your current extension folder** (replace files).
+2. Click **Reload now** in the popup.
+
 ## Usage stats
 
 The badges above are public counters. The extension adds **+1** to:
